@@ -36,10 +36,10 @@ public class CassandraMigrationAutoConfigurationTest {
 
     @BeforeClass
     public static void beforeClass() {
-        cassandra = new CassandraBuilder()
-                .version("3.11.12")
-                .build();
-        cassandra.start();
+//        cassandra = new CassandraBuilder()
+//                .version("3.11.12")
+//                .build();
+//        cassandra.start();
         session = createSession();
         dropKeyspaceIfExists();
     }
@@ -52,9 +52,9 @@ public class CassandraMigrationAutoConfigurationTest {
     @AfterClass
     public static void stopDb() {
         session.close();
-        if (null != cassandra) {
-            cassandra.stop();
-        }
+//        if (null != cassandra) {
+//            cassandra.stop();
+//        }
     }
 
     private static void createKeyspace() {

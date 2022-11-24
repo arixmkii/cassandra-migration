@@ -6,7 +6,9 @@ import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.cql.*;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException;
-import org.cognitor.cassandra.migration.cql.SimpleCQLLexer;
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.misc.Interval;
+import org.cognitor.cassandra.migration.antlr4.*;
 import org.cognitor.cassandra.migration.keyspace.Keyspace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +18,8 @@ import java.io.Closeable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Instant;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 
 import static java.lang.String.format;
@@ -80,6 +84,11 @@ public class Database implements Closeable {
      * Error message that is thrown if there is an error during the migration
      */
     private static final String MIGRATION_ERROR_MSG = "Error during migration of script %s while executing '%s'";
+
+    /***
+     * Error message that is thrown if parser fails
+     */
+    private static final String MIGRATION_PARSER_MSG = "Error during parsing of script %s";
 
     /**
      * TTL of the inserts in the schema leader table (if consensus is used for the migration), in seconds.
@@ -361,9 +370,19 @@ public class Database implements Closeable {
                 migration.getVersion()));
         String lastStatement = null;
         try {
-            SimpleCQLLexer lexer = new SimpleCQLLexer(migration.getMigrationScript());
-            for (String statement : lexer.getCqlQueries()) {
-                statement = statement.trim();
+            CqlLexer lexer = new CqlLexer(CharStreams.fromString(migration.getMigrationScript()));
+            TokenStream tokenStream = new CommonTokenStream(lexer);
+            CqlParser parser = new CqlParser(tokenStream);
+            TokenStreamRewriter tokenStreamRewriter = new TokenStreamRewriter(tokenStream);
+            List<String> statements = new LinkedList<String>();
+            for (CqlParser.CqlContext ctx : parser.root().cqls().cql()) {
+                Interval interval = ctx.getSourceInterval();
+                statements.add(tokenStreamRewriter.getText(interval).trim());
+            }
+            if (parser.getNumberOfSyntaxErrors() > 0) {
+                throw new RuntimeException("Parser error");
+            }
+            for (String statement: statements) {
                 lastStatement = statement;
                 executeMigrationStatement(statement, migration);
             }
@@ -372,7 +391,12 @@ public class Database implements Closeable {
                     migration.getScriptName(), migration.getVersion()));
         } catch (Exception exception) {
             logMigration(migration, false);
-            String errorMessage = format(MIGRATION_ERROR_MSG, migration.getScriptName(), lastStatement);
+            String errorMessage;
+            if (lastStatement != null) {
+                errorMessage = format(MIGRATION_ERROR_MSG, migration.getScriptName(), lastStatement);
+            } else {
+                errorMessage = format(MIGRATION_PARSER_MSG, migration.getScriptName());
+            }
             throw new MigrationException(errorMessage, exception, migration.getScriptName(), lastStatement);
         }
     }

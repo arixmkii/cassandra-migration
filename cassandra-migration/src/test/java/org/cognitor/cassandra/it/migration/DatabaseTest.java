@@ -50,18 +50,18 @@ public class DatabaseTest {
 
     @BeforeClass
     public static void initDb() {
-        cassandra = new CassandraBuilder()
-                .version("3.11.12")
-                .addConfigProperty("enable_user_defined_functions", true)
-                .build();
-        cassandra.start();
+//        cassandra = new CassandraBuilder()
+//                .version("4.0.7")
+//                .addConfigProperty("enable_user_defined_functions", true)
+//                .build();
+//        cassandra.start();
     }
 
     @AfterClass
     public static void stopDb() {
-        if (null != cassandra) {
-            cassandra.stop();
-        }
+//        if (null != cassandra) {
+//            cassandra.stop();
+//        }
     }
 
     @Before
@@ -234,7 +234,7 @@ public class DatabaseTest {
         assertThat(exception, is(not(nullValue())));
         assertThat(exception.getMessage(), is(not(nullValue())));
         assertThat(exception.getScriptName(), is(equalTo("001_init.cql")));
-        assertThat(exception.getStatement(), is(equalTo("CREATE TABLE PERSON (id uuid primary key, name varcha);")));
+        assertThat(exception.getStatement(), is(equalTo("CREATE TABLE PERSON (id uuid primary key, name varcha)")));
         session = createSession();
         session.execute("USE " + KEYSPACE);
         List<Row> results = loadMigrations("");
@@ -263,14 +263,14 @@ public class DatabaseTest {
         Database database = new Database(session, KEYSPACE);
         assertThat(session.getMetadata().getKeyspace(NETWORK_KEYSPACE).isPresent(), is(false));
         Keyspace keyspace = new Keyspace(NETWORK_KEYSPACE)
-                .with(new NetworkStrategy().with("dc1", 1));
+                .with(new NetworkStrategy().with("datacenter1", 1));
         Database db = new Database(session, keyspace);
 
         KeyspaceMetadata keyspaceMetadata = session.getMetadata().getKeyspace(NETWORK_KEYSPACE).get();
         assertThat(keyspaceMetadata, is(notNullValue()));
         assertThat(keyspaceMetadata.getReplication().get("class"),
                 is(equalTo("org.apache.cassandra.locator.NetworkTopologyStrategy")));
-        assertThat(keyspaceMetadata.getReplication().get("dc1"), is(equalTo("1")));
+        assertThat(keyspaceMetadata.getReplication().get("datacenter1"), is(equalTo("1")));
     }
 
     @Test
